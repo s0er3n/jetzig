@@ -1,5 +1,5 @@
 const std = @import("std");
-const jetzig = @import("jetzig.zig");
+const jetzig = @import("jetzig");
 
 ast: std.zig.Ast = undefined,
 allocator: std.mem.Allocator,
@@ -278,6 +278,7 @@ fn writeRoute(self: *Routes, writer: std.ArrayList(u8).Writer, route: Function) 
         \\            .template = "{6s}",
         \\            .layout = if (@hasDecl(@import("{7s}"), "layout")) @import("{7s}").layout else null,
         \\            .json_params = &[_][]const u8 {{ {8s} }},
+        \\            .formats = if (@hasDecl(@import("{7s}"), "formats")) @import("{7s}").formats else null,
         \\        }},
         \\
     ;
@@ -597,7 +598,7 @@ fn asNodeIndex(index: usize) std.zig.Ast.Node.Index {
 }
 
 fn isActionFunctionName(name: []const u8) bool {
-    inline for (@typeInfo(jetzig.views.Route.Action).Enum.fields) |field| {
+    inline for (@typeInfo(jetzig.views.Route.Action).@"enum".fields) |field| {
         if (std.mem.eql(u8, field.name, name)) return true;
     }
 

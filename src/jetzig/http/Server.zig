@@ -82,7 +82,7 @@ const Dispatcher = struct {
 pub fn listen(self: *Server) !void {
     try self.decodeStaticParams();
 
-    var httpz_server = try httpz.ServerCtx(Dispatcher, Dispatcher).init(
+    var httpz_server = try httpz.Server(Dispatcher).init(
         self.allocator,
         .{
             .port = self.options.port,
@@ -195,6 +195,12 @@ fn renderResponse(self: *Server, request: *jetzig.http.Request) !void {
     }
 
     const route = self.matchCustomRoute(request) orelse try self.matchRoute(request, false);
+
+    if (route) |capture| {
+        if (!capture.validateFormat(request)) {
+            return request.setResponse(try self.renderNotFound(request), .{});
+        }
+    }
 
     switch (request.requestFormat()) {
         .HTML => try self.renderHTML(request, route),

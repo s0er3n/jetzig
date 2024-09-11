@@ -135,7 +135,7 @@ pub fn request(self: *App, comptime method: jetzig.http.Request.Method, comptime
     return .{
         .allocator = self.arena.allocator(),
         .status = httpz_response.status,
-        .body = try self.arena.allocator().dupe(u8, httpz_response.body orelse ""),
+        .body = try self.arena.allocator().dupe(u8, httpz_response.body),
         .headers = try headers.toOwnedSlice(),
         .jobs = try jobs.toOwnedSlice(),
     };
@@ -145,7 +145,7 @@ pub fn request(self: *App, comptime method: jetzig.http.Request.Method, comptime
 pub fn params(self: App, args: anytype) []Param {
     const allocator = self.arena.allocator();
     var array = std.ArrayList(Param).init(allocator);
-    inline for (@typeInfo(@TypeOf(args)).Struct.fields) |field| {
+    inline for (@typeInfo(@TypeOf(args)).@"struct".fields) |field| {
         array.append(.{ .key = field.name, .value = @field(args, field.name) }) catch @panic("OOM");
     }
     return array.toOwnedSlice() catch @panic("OOM");
@@ -166,7 +166,7 @@ pub fn multipart(self: *App, comptime args: anytype) []const u8 {
     const boundary = jetzig.util.generateRandomString(&boundary_buf);
     self.multipart_boundary = boundary;
 
-    inline for (@typeInfo(@TypeOf(args)).Struct.fields, 0..) |field, index| {
+    inline for (@typeInfo(@TypeOf(args)).@"struct".fields, 0..) |field, index| {
         if (index > 0) tryWrite(writer, "\r\n");
         tryWrite(writer, "--");
         tryWrite(writer, boundary);
@@ -208,6 +208,7 @@ fn stubbedRequest(
     multipart_boundary: ?[]const u8,
     options: RequestOptions,
 ) !httpz.Request {
+    // TODO: Use httpz.testing
     var request_headers = try keyValue(allocator, 32);
     for (options.headers) |header| request_headers.add(header.name, header.value);
     if (options.json != null) {
@@ -237,6 +238,8 @@ fn stubbedRequest(
             .path = path,
             .query = query,
         },
+        .route_data = null,
+        .middlewares = undefined,
         .address = undefined,
         .method = std.enums.nameCast(httpz.Method, @tagName(method)),
         .protocol = .HTTP11,
@@ -256,6 +259,7 @@ fn stubbedRequest(
 }
 
 fn stubbedResponse(allocator: std.mem.Allocator) !httpz.Response {
+    // TODO: Use httpz.testing
     return .{
         .conn = undefined,
         .pos = 0,
@@ -265,9 +269,9 @@ fn stubbedResponse(allocator: std.mem.Allocator) !httpz.Response {
         .arena = allocator,
         .written = false,
         .chunked = false,
-        .disowned = false,
         .keepalive = false,
-        .body = null,
+        .body = "",
+        .buffer = .{ .pos = 0, .data = "" },
     };
 }
 
@@ -287,7 +291,7 @@ fn createStore(allocator: std.mem.Allocator) !*jetzig.kv.Store {
 
 fn buildOptions(app: *const App, args: anytype) RequestOptions {
     const fields = switch (@typeInfo(@TypeOf(args))) {
-        .Struct => |info| info.fields,
+        .@"struct" => |info| info.fields,
         else => @compileError("Expected struct, found `" ++ @tagName(@typeInfo(@TypeOf(args))) ++ "`"),
     };
 
